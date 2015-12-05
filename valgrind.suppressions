@@ -1,0 +1,19 @@
+{
+   popt
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   obj:/lib/x86_64-linux-gnu/libpopt.so.0.0.0
+   fun:poptGetNextOpt
+   fun:_ZN10CmdOptionsC1EiPPKc
+   ...
+}
+{
+   popt_2
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:poptGetNextOpt
+   fun:_ZN10CmdOptionsC1EiPPKc
+   ...
+}

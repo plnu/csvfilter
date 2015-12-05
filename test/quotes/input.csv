@@ -1,0 +1,6 @@
+col1,col2,col3
+unquoted space,more spaces,trailing spaces   
+"simplequote","andagain",""
+"quotes and spaces","  ","more spaces"
+"escaped quotes "" "," "" "" ",""
+"quoted, commas",",,,",

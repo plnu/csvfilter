@@ -1,0 +1,165 @@
+#!@TCLSH_EXECUTABLE@
+
+proc RunCmd { cmdAndArgs } {
+    
+    set retArray(success) 1
+
+    if { [catch [list open [concat "|" $cmdAndArgs]] pipe] } {
+        set retArray(success) 0
+        set retArray(errorMsg) $pipe
+    } else {
+        set retArray(stdout) [read $pipe]
+        set retArray(exitCode) 0
+        if {[catch {close $pipe} retArray(stderr)] != 0} {
+            global errorCode
+            if {"CHILDSTATUS" == [lindex $errorCode 0]} {
+                set retArray(exitCode) [lindex $errorCode 2]
+            } elseif {"CHILDKILLED" == [lindex $errorCode 0]} {
+                set retArray(success) 0
+                set retArray(errorMsg) \
+                    "Process killed with [lindex $errorCode 2]"
+            }
+        }
+    }
+    return [array get retArray]
+}
+
+proc testSuccessfulCommand { description args outputFile } {
+    global csvFilter
+    set ok 1
+
+    if { [catch [list open $outputFile] fd] } {
+        set ok 0
+        Fail $description $fd
+    } else {
+        set expectedOutput [read $fd]
+        if { [catch [list close $fd] err] } {
+            set ok 0
+            Fail $description $fd
+        }
+    }
+
+    if { $ok } {
+        array set cmdResult [RunCmd [concat $csvFilter $args]]
+        if { $cmdResult(success) == 0 } {
+            set ok 0
+            Fail $description $cmdResult(errorMsg)
+        } elseif { "$cmdResult(stderr)" != "" } {
+            set ok 0
+            Fail $description "Standard error was written to:\
+                                $cmdResult(stderr)"
+        } elseif { $cmdResult(exitCode) != 0 } {
+            set ok 0
+            Fail $description "Standard error was written to:\
+                                $cmdResult(stderr)"
+        } elseif { $cmdResult(stdout) != $expectedOutput } {
+            set ok 0
+            Fail $description \
+                "Output was incorrect. Expected\n---$expectedOutput---\nGot \
+                 \n---$cmdResult(stdout)---"
+        } else {
+            Pass $description
+        }
+    }
+
+}
+
+proc testErrorCommand { description args expectedError } {
+    global csvFilter
+    set ok 1
+
+    array set cmdResult [RunCmd [concat $csvFilter $args]]
+    if { $cmdResult(success) == 0 } {
+        set ok 0
+        Fail $description $cmdResult(errorMsg)
+    } elseif { $cmdResult(exitCode) == 0 } {
+        set ok 0
+        Fail $description "Exit code was unexpectedly 0"
+    } elseif { $cmdResult(stderr) != $expectedError } {
+        set ok 0
+        Fail $description "Standard error incorrect. Expected\n$expectedError\nGot\n$cmdResult(stderr)"
+    } else {
+        # We don't validate stdout in this case - it's acceptable for the
+        # command to have produced output before encountering the error
+        Pass $description
+    }
+    return $ok
+}
+
+##
+#
+# Return the entire content of the file $name. Will throw an error if the file
+# cannot be read for any reason.
+#
+proc ReadFile { name } {
+    set fd [open $name]
+    set result [read $fd]
+    close $fd
+
+    return $result
+}
+
+set testResults(FAIL) 0
+set testResults(COUNT) 0
+
+proc Fail { description reason } {
+    global testResults
+    incr testResults(COUNT)
+    incr testResults(FAIL)
+    puts "\[FAIL\] $description"
+    puts "      $reason"
+}
+
+proc Pass { description } {
+    global testResults
+    incr testResults(COUNT)
+    puts "\[PASS\] $description"
+}
+
+proc Summary { } {
+    global testResults
+    puts ""
+    puts "OVERALL RESULTS"
+    puts -nonewline "$testResults(FAIL) of $testResults(COUNT) failed: "
+    if { $testResults(FAIL) == 0 } {
+        puts "PASS"
+    } else {
+        puts "FAIL"
+    }
+}
+
+proc ExitCode { } {
+    global testResults
+    set exitCode 0
+    if { $testResults(FAIL) > 0 } {
+        set exitCode 1
+    }
+    return $exitCode
+}
+
+if { [llength $argv] != 0} {
+   puts "Usage: [file tail $argv0]"
+   exit 1
+}
+
+set csvFilter [file join @PROJECT_BINARY_DIR@ bin csvfilter]
+set testDir [file join @CMAKE_SOURCE_DIR@ test]
+
+foreach potentialTest [glob [file join $testDir *]] {
+    if { [file isdirectory $potentialTest] } {
+        cd $potentialTest
+
+        set cmdArgs [ReadFile cmdArgs]
+
+        if { [file exists output.csv] } {
+            testSuccessfulCommand [file tail $potentialTest] $cmdArgs output.csv
+        } else {
+            set expectedError [ReadFile error]
+            testErrorCommand [file tail $potentialTest] $cmdArgs $expectedError
+        }
+    }
+}
+
+
+Summary
+exit [ExitCode]

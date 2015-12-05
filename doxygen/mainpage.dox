@@ -1,0 +1,7 @@
+/**
+ * @mainpage csvfiler application documentation
+ *
+ * csvfilter is an application that reads csv files, and filters out rows and
+ * columns.
+ *
+ */

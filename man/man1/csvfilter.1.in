@@ -1,0 +1,164 @@
+.\" Manpage for csvfilter
+.\" Contact vivek@nixcraft.net.in to correct errors or typos.
+.TH csvfilter 1 "@BUILD_DATE@" "@CSVFILTER_VERSION_MAJOR@.@CSVFILTER_VERSION_MINOR@" "csvfilter man page"
+.SH NAME
+.B csvfilter 
+\-\- filter rows and columns out of a CSV file
+.SH SYNOPSIS
+.B csvfilter 
+{
+.B \-h
+|
+.B \-\-help
+}
+.br
+.B csvfilter 
+{
+.B \-v
+|
+.B \-\-version
+}
+.br
+.B csvfilter 
+[
+.B \-c 
+output columns ] [
+.B \-f 
+filter expression ] [ filename ]
+.br
+.B csvfilter
+{
+.B \-s
+|
+.B \-\-show\-headers
+} [ filename ]
+
+.SH DESCRIPTION
+csvfilter is a utility that allows quick and easy filtering of CSV-formatted
+data. The user can specify which columns of data are output, and also filter
+rows via a simple expression.
+.SH OPTIONS
+.TP
+.B \-h \-\-help
+Print the help message
+.TP
+.B \-v \-\-version
+Print the version number
+.TP
+.B -c \fRcolumns or\fP  --columns \fRcolumns
+A comma-separated list of columns that should be output. Columns can be referred
+to by their headers in the input file, or the aliases that are shown by
+\fB-s\fP.
+
+.TP
+.B -f \fRexpression or\fP --filter \fRexpression
+Apply the supplied expression to each line of the input file, only writing the line to the output if the expression evaluates to true. See
+.B FILTER EXPRESSIONS
+for a description of the expression format.
+.TP
+.B -s \fRor\fP --show-headers
+List the column headers from the input file, together with any aliases that have
+been generated for use in filter expressions.
+
+.SH IDENTIFYING COLUMNS
+.B csvfilter
+always assumes that the first row of the input file is a set of headers for the
+data, and identifies columns by the names provided there. It is possible that
+the headers in the file are not suitable for use in expressions (e.g. they
+contain characters such as " " or "+"), or are not unique (e.g. there are two
+columns called "time"). In this case
+.B csvfilter
+automatically generates a set of aliases for the headers which can be used
+instead. To see these aliases use the 
+.B -s
+flag.
+.SH FILTER EXPRESSIONS
+Filter expressions are simple expressions that use c-like operators, and are
+evaluated in the context of each row of the file. For example, the expression
+"height > 100" would return true whenever the value in the height column was
+greater than 100.
+.PP
+Filter expressions consist of the following components:
+.TP 
+Constants
+String constants are enclosed by double quotes, such as "string value". If the string contains a double quote then it can be escaped by a backslash: ""\\"".
+.br
+Number constants use the standard notation such as -12.4.
+.TP
+Column refererences
+Data from the current row can be referenced by the column header. In the case
+where column headers are repeated, or if the header contains unusual characters,
+the alias should be used instead. Use the 
+.B -s
+option to see the aliases that have been assigned.
+.TP
+.B ( )
+Brackets can be used to override the precedence of operators in the usual
+way. Without rackets all the operators have the precedence as defined by the C
+language.
+.TP
+.B +
+The plus operator is used for both addition and string concatenation, depending
+on the type of its arguments.
+.TP
+.B - * /
+Minus, times and divide only act on numbers, and return a number.
+.TP
+.B < <= == != >= >
+Comparison operators (less than, less than or equal, equals, not equal, greater
+than or equal, and greater than, respectively) act on strings and numbers, and
+the type is deduced from the context. They return booleans.
+.TP
+.B && ||
+Both logical and and logical or operate on booleans and return booleans.
+.SH EXIT STATUS
+.B csvfilter
+returns 0 upon success, and non-zero if any errors were found. Errors include
+invalid arguments, filter expressions that could not be parsed or evaluated and
+badly formed csv files.
+.SH EXAMPLES
+All below following examples use the following csv file as input:
+.br
+name,height,sex
+.br
+Mark,170.00,M
+.br
+Jane,156.00,F
+.br
+Fred,183.00,M
+.br
+Mary,162.00,F
+.PP
+The command
+.B csvfilter -c \(dqname,sex\(dq
+will print the name and sex columns:
+.br
+name,sex
+.br
+Mark,M
+.br
+Jane,F
+.br
+Fred,M
+.br
+Mary,F
+.PP
+The command
+.B csvfilter -f 'sex == \(dqM\(dq'
+will print the men:
+.br
+name,height,sex
+.br
+Mark,170.00,M
+.br
+Fred,183.00,M
+.PP
+The command
+.B csvfilter -c \(dqsex\(dq -f \(dqheight < 160 || height > 180\(dq
+will print the names of the short and tall people:
+.br
+name
+.br
+Jane
+.br
+Fred

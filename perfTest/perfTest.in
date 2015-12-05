@@ -1,0 +1,91 @@
+#!@TCLSH_EXECUTABLE@
+
+proc TimeCmd { cmdAndArgs } {
+    set retArray(success) 1
+    set start [clock clicks -milliseconds]
+
+    set cmd [concat exec $cmdAndArgs]
+
+    if { [catch $cmd result] } {
+        puts ""
+        puts "Failed to execute $cmdAndArgs: $result"
+        exit 1
+    }
+    set end [clock clicks -milliseconds]
+    return [expr $end - $start]
+}
+
+proc DoTest { testName csvCmd awkCmd } {
+    global totals
+
+    puts "Test: $testName"
+    puts -nonewline "csvfilter version: "
+    flush stdout
+    set csvTime [TimeCmd $csvCmd]
+    puts $csvTime
+    puts -nonewline "awk version:       "
+    flush stdout
+    set awkTime [TimeCmd $awkCmd]
+    puts $awkTime
+    puts "As percentage:     [expr 100.0 * $csvTime / $awkTime]%"
+    puts ""
+    incr totals(csv) $csvTime
+    incr totals(awk) $awkTime
+}
+
+proc PrintTotal {} {
+    global totals
+    puts "Total"
+    puts "csvfilter took [expr 100.0 * $totals(csv) / $totals(awk)]% of awk"
+}
+
+set totals(csv) 0
+set totals(awk) 0
+
+if { $argc != 0 } {
+    puts "Usage [file tail $argv0]"
+    exit 1
+}
+set srcDir @CMAKE_SOURCE_DIR@
+set buildDir @PROJECT_BINARY_DIR@
+set csvfilter $buildDir/bin/csvfilter
+set awk @AWK_EXECUTABLE@
+
+DoTest "flag == 1" \
+       [list $csvfilter -f flag==1 \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, {NR==1 {print} NR != 1 && $3 == 1 {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+DoTest "\"A\" + letter < \"AM\"" \
+       [list $csvfilter -f {"A" + letter < "AM"} \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, {NR==1 {print} NR != 1 && "A"$5 < "AM" {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+DoTest "1 + rand_0_1 < 1.5" \
+       [list $csvfilter -f {1 + rand_0_1 < 1.5} \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, {NR==1 {print} NR != 1 && 1 + $4 < 1.5 {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+DoTest "1 - rand_0_1 < 0.5" \
+       [list $csvfilter -f {1 - rand_0_1 < 0.5} \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, {NR==1 {print} NR != 1 && 1 - $4 < 0.5 {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+DoTest "flag == 1 || letter == \"A\"" \
+       [list $csvfilter -f {flag == 1 || letter == "A"} \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, \
+             {NR==1 {print} NR != 1 && ($3 == 1 || $5 == "A") {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+DoTest "- rand_0_1 < - 0.5" \
+       [list $csvfilter -f {- rand_0_1 < - 0.5} \
+            $srcDir/perfTest/data.csv > /dev/null] \
+       [list $awk -F, {NR==1 {print} NR != 1 && (-$4 < -0.5) {print}} \
+            $srcDir/perfTest/data.csv > /dev/null]
+
+PrintTotal
